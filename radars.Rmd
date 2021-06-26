@@ -1,0 +1,137 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+libraries
+```{r}
+
+library(tidyverse)
+library(tidylog)
+library(tidytuesdayR)
+library(janitor)
+library(DataExplorer)
+library(plotly)
+library(esquisse)
+library(scales)
+library(fmsb)
+```
+
+Load data
+```{r}
+
+raw_data <-tt_load('2021-06-22')[[1]]
+
+#fix some messy columns
+raw_data <- raw_data %>%
+  mutate(across(c(pct_near_park_data, park_pct_city_data), ~ as.numeric(str_sub(.x, end = str_length(.x) -1)))) %>%
+  mutate(spend_per_resident_data = as.numeric(str_sub(spend_per_resident_data, start = 2)))
+
+
+#unique cities
+cities <- raw_data %>%
+  tabyl(city)
+
+
+#add max and min for each relevant column for the radars
+
+min <- raw_data %>%
+  summarise(across(.cols = where(is.numeric),  ~ min(.x, na.rm = TRUE))) %>%
+  mutate(city = "aa_min") #so that I recognise this in my aggregate data. 
+#calling it aa_min so that it's always first in the row when arranged
+
+max <- raw_data %>%
+  summarise(across(.cols = where(is.numeric),  ~ max(.x, na.rm = TRUE))) %>%
+  mutate(city = "aa_max") #so that I recognise this in my aggregate data
+#calling it aa_max so that it's always 2nd in the row when arranged
+
+clean_data <- raw_data %>% 
+  bind_rows(min) %>%
+  bind_rows(max)
+
+```
+
+Try radar charts for a couple of cities showing several dimensions for oldest and newest years
+```{r}
+
+#phily
+
+phily <- clean_data  %>%
+  filter(city %in% c("Philadelphia", "aa_min", "aa_max")) %>%
+  filter(year == max(year) | year == min(year)) %>%
+  select(city, year, pct_near_park_data, spend_per_resident_data, park_pct_city_data, playground_data, rank, total_pct) 
+
+#select just the columns for the radar
+plot <- phily %>%
+  arrange(city) %>%
+  select(total_pct, spend_per_resident_data, park_pct_city_data, playground_data, pct_near_park_data ) 
+
+#set-up colours for the polygons- These are copied from online example and are good enough
+colors_border <- c( rgb(0.2,0.5,0.5,0.9), rgb(0.8,0.2,0.5,0.9))
+colors_in <- c( rgb(0.2,0.5,0.5,0.4), rgb(0.8,0.2,0.5,0.4))
+caxis_labels <- as.character(as.numeric(plot[2,]))
+
+  
+radarchart(plot, axistype=2, 
+    #custom polygon
+    pcol=colors_border, pfcol=colors_in, plwd=4, plty=1,
+    #custom the grid
+    cglcol="grey", cglty=1, cglwd=0.6, calcex = 0.4,
+ 
+    #custom labels
+    vlcex=0.8, vlabels = c("Total points", "Spend per resident", "Parkland as % of city area",
+                           "Playgrounds per 10k res.", "% of res within a 10 minute walk to park"),
+    #title 
+    title = "City data for Philly, 2012 compared with 2020"
+    )
+
+# Add a legend and title
+legend(x=0.7, y=1, legend = c("2020", "2012"), bty = "n", pch=20 , col=colors_in , text.col = "black", cex=1.2, pt.cex=3)
+title(sub = "Improvements, but a drop from 10th to 15th place")
+
+#shame that I can't label the inside and outside of each segment. Hard for anyone to read the chart as is
+##also the value for % within 10 min walk is so high it's hard to see.
+
+```
+
+As above but for Atlanta
+```{r}
+
+atlanta <- clean_data  %>%
+  filter(city %in% c("Atlanta", "aa_min", "aa_max")) %>%
+  filter(year == max(year) | year == min(year)) %>%
+  select(city, year, pct_near_park_data, spend_per_resident_data, park_pct_city_data, playground_data, rank, total_pct) 
+
+#select just the columns for the radar
+plot <- atlanta %>%
+  arrange(city) %>% 
+  select(total_pct, spend_per_resident_data, park_pct_city_data, playground_data, pct_near_park_data ) 
+
+#set-up colours for the polygons- These are copied from online example and are good enough
+colors_border <- c( rgb(0.2,0.5,0.5,0.9), rgb(0.8,0.2,0.5,0.9))
+colors_in <- c( rgb(0.2,0.5,0.5,0.4), rgb(0.8,0.2,0.5,0.4))
+caxis_labels <- as.character(as.numeric(plot[2,]))
+
+  
+radarchart(plot, axistype=2, 
+    #custom polygon
+    pcol=colors_border, pfcol=colors_in, plwd=4, plty=1,
+    #custom the grid
+    cglcol="grey", cglty=1, cglwd=0.6, calcex = 0.4,
+ 
+    #custom labels
+    vlcex=0.8, vlabels = c("Total points", "Spend per resident", "Parkland as % of city area",
+                           "Playgrounds per 10k res.", "% of res within a 10 minute walk to park"),
+    #title 
+    title = "City data for Atlanta, 2012 compared with 2020"
+    )
+
+# Add a legend and title
+legend(x=0.7, y=1, legend = c("2020", "2012"), bty = "n", pch=20 , col=colors_in , text.col = "black", cex=1.2, pt.cex=3)
+title(sub = "Improvements, but a drop from 26th to 40th place")
+
+#shame that I can't label the inside and outside of each segment. Hard for anyone to read the chart as is
+##also the value for % within 10 min walk is so high it's hard to see.
+
+```
+
